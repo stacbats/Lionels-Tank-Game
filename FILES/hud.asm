@@ -15,38 +15,41 @@ DrawDecor: {
 }
 
 // -------------------------------------------------------------
-// DrawHud  -  top status bar (balloon name + lives + tank name)
-//   Switches to ROM charset to write PETSCII text, then restores
-//   game charset.  Safe now there is no raster IRQ.
+// DrawHud  -  top status bar using game charset slots 72-80
+//   No charset switching needed - ROM letter shapes were copied
+//   into our game charset by CopyRomCharsToGameset at startup.
 // -------------------------------------------------------------
 DrawHud: {
-    jsr UseRomCharset       // ROM charset so PETSCII text renders correctly
-
-    // blank top row
+    // blank top row with space slot
     ldx #39
 !clr:
-    lda #$20; sta SCREEN_RAM,x
+    lda #HUD_SLOT_SPC; sta SCREEN_RAM,x
     lda #$00; sta COLOR_RAM,x
     dex
     bpl !clr-
 
-    // "BALLOON" label
+    // "BALLOON" = B,A,L,L,O,O,N
+    lda #HUD_SLOT_B; sta SCREEN_RAM+0
+    lda #HUD_SLOT_A; sta SCREEN_RAM+1
+    lda #HUD_SLOT_L; sta SCREEN_RAM+2
+    lda #HUD_SLOT_L; sta SCREEN_RAM+3
+    lda #HUD_SLOT_O; sta SCREEN_RAM+4
+    lda #HUD_SLOT_O; sta SCREEN_RAM+5
+    lda #HUD_SLOT_N; sta SCREEN_RAM+6
     ldx #0
-!lbl_b:
-    lda txt_balloon,x
-    sta SCREEN_RAM,x
-    lda #$07; sta COLOR_RAM,x
-    inx; cpx #7; bne !lbl_b-
+!col_b:
+    lda #$07; sta COLOR_RAM,x   // yellow
+    inx; cpx #7; bne !col_b-
 
     // balloon life pips
     ldx #0
 !pips_b:
     cpx lives_ball
     bcs !empty_b+
-    lda #$51           // filled circle
+    lda #HUD_SLOT_PIP
     jmp !set_b+
 !empty_b:
-    lda #$20           // space
+    lda #HUD_SLOT_SPC
 !set_b:
     sta SCREEN_RAM+8,x
     lda #$07; sta COLOR_RAM+8,x
@@ -57,24 +60,25 @@ DrawHud: {
 !pips_t:
     cpx lives_tank
     bcs !empty_t+
-    lda #$51
+    lda #HUD_SLOT_PIP
     jmp !set_t+
 !empty_t:
-    lda #$20
+    lda #HUD_SLOT_SPC
 !set_t:
     sta SCREEN_RAM+29,x
     lda #$05; sta COLOR_RAM+29,x
     inx; cpx #5; bne !pips_t-
 
-    // "TANK" label
+    // "TANK" = T,A,N,K
+    lda #HUD_SLOT_T; sta SCREEN_RAM+35
+    lda #HUD_SLOT_A; sta SCREEN_RAM+36
+    lda #HUD_SLOT_N; sta SCREEN_RAM+37
+    lda #HUD_SLOT_K; sta SCREEN_RAM+38
     ldx #0
-!lbl_t:
-    lda txt_tank,x
-    sta SCREEN_RAM+35,x
-    lda #$05; sta COLOR_RAM+35,x
-    inx; cpx #4; bne !lbl_t-
+!col_t:
+    lda #$05; sta COLOR_RAM+35,x  // green
+    inx; cpx #4; bne !col_t-
 
-    jsr UseGameCharset      // restore game charset for map tiles
     rts
 }
 

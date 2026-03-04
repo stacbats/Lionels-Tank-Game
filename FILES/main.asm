@@ -54,7 +54,7 @@ GameInit:
     jsr SoundInit           // SID: full volume, gate off
     jsr CopySpritesToMem    // blit sprite pixel data to $2000
     jsr LoadCharset         // copy Chars.bin → $2800, set VIC_MEMCTRL=$1A
-                            // must run ONCE before any screen output
+    jsr CopyRomCharsToGameset // copy A,B,K,L,N,O,T,pip into slots 72-80
     jsr UseRomCharset       // switch back to ROM charset for menu text
 
     lda #0; sta VIC_BORDER; sta VIC_BG

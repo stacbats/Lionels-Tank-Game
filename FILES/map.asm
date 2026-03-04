@@ -75,6 +75,97 @@ LoadCharset: {
 }
 
 // =============================================================
+// CopyRomCharsToGameset
+//   Copies 9 specific ROM chars into game charset slots 72-80.
+//   After this, HUD can write slot numbers to screen RAM and
+//   the chars render correctly through the game charset — no
+//   charset switching needed during gameplay.
+//
+//   ROM charset: CPU address $E000 (visible when KERNAL mapped in,
+//   which is the default: $01 = $37).  Each char = 8 bytes.
+//
+//   Slot map (written into CHARSET_ADDR + slot*8):
+//     72=A  73=B  74=K  75=L  76=N  77=O  78=T  79=pip($51)  80=space
+// =============================================================
+.const HUD_SLOT_A     = 72
+.const HUD_SLOT_B     = 73
+.const HUD_SLOT_K     = 74
+.const HUD_SLOT_L     = 75
+.const HUD_SLOT_N     = 76
+.const HUD_SLOT_O     = 77
+.const HUD_SLOT_T     = 78
+.const HUD_SLOT_PIP   = 79
+.const HUD_SLOT_SPC   = 80
+
+CopyRomCharsToGameset: {
+    // Char ROM is at CPU $D000 but hidden behind I/O by default.
+    // Set $01 = $31 to disable I/O and expose char ROM at $D000.
+    // Restore $01 = $37 afterwards.
+    sei                         // no IRQs while I/O is off (SID/VIC inaccessible)
+    lda #$31; sta $01           // I/O off → char ROM visible at $D000
+
+    ldx #0
+!copy_A:
+    lda $d008,x                 // A = char 1, $D000 + 1*8
+    sta CHARSET_ADDR + HUD_SLOT_A * 8,x
+    inx; cpx #8; bne !copy_A-
+
+    ldx #0
+!copy_B:
+    lda $d010,x                 // B = char 2, $D000 + 2*8
+    sta CHARSET_ADDR + HUD_SLOT_B * 8,x
+    inx; cpx #8; bne !copy_B-
+
+    ldx #0
+!copy_K:
+    lda $d058,x                 // K = char 11, $D000 + 11*8
+    sta CHARSET_ADDR + HUD_SLOT_K * 8,x
+    inx; cpx #8; bne !copy_K-
+
+    ldx #0
+!copy_L:
+    lda $d060,x                 // L = char 12, $D000 + 12*8
+    sta CHARSET_ADDR + HUD_SLOT_L * 8,x
+    inx; cpx #8; bne !copy_L-
+
+    ldx #0
+!copy_N:
+    lda $d070,x                 // N = char 14, $D000 + 14*8
+    sta CHARSET_ADDR + HUD_SLOT_N * 8,x
+    inx; cpx #8; bne !copy_N-
+
+    ldx #0
+!copy_O:
+    lda $d078,x                 // O = char 15, $D000 + 15*8
+    sta CHARSET_ADDR + HUD_SLOT_O * 8,x
+    inx; cpx #8; bne !copy_O-
+
+    ldx #0
+!copy_T:
+    lda $d0a0,x                 // T = char 20, $D000 + 20*8
+    sta CHARSET_ADDR + HUD_SLOT_T * 8,x
+    inx; cpx #8; bne !copy_T-
+
+    ldx #0
+!copy_pip:
+    lda $d288,x                 // pip $51=81, $D000 + 81*8 = $D288
+    sta CHARSET_ADDR + HUD_SLOT_PIP * 8,x
+    inx; cpx #8; bne !copy_pip-
+
+    lda #$37; sta $01           // restore: I/O back on
+    cli
+
+    // slot 80 = space: 8 zero bytes (blank)
+    ldx #0
+!copy_spc:
+    lda #0
+    sta CHARSET_ADDR + HUD_SLOT_SPC * 8,x
+    inx; cpx #8; bne !copy_spc-
+
+    rts
+}
+
+// =============================================================
 // UseRomCharset  -  switch VIC to built-in ROM character set.
 //   Call this before drawing any PETSCII text (menus, HUD, etc.)
 //   The C64 ROM charset is always in ROM at $E000/$E800 and is
