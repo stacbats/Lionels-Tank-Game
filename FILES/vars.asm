@@ -23,7 +23,10 @@
 .const IRQ_VEC_HI    = $0315   // KERNAL IRQ vector (hi)
 .const S_COLLISION   = $d01e
 .const VIC_BORDER    = $d020
+.const VIC_CTRL2     = $d016   // bit4=MCM enable, bit3=38col, bits0-2=XSCROLL
 .const VIC_BG        = $d021
+.const VIC_MC1       = $d022   // multicolour colour 1 (shared across all MC chars)
+.const VIC_MC2       = $d023   // multicolour colour 2 (shared across all MC chars)
 .const VIC_SPR_COL   = $d025   // sprite multicolour 1
 .const VIC_MEMCTRL   = $d018   // VIC memory bank / charset ptr
 .const MEMCTRL_ROM   = $15     // screen=$0400, VIC reads built-in ROM charset

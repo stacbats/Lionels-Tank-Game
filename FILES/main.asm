@@ -171,7 +171,7 @@ StartGame: {
     sta is_dropping
     sta tank_fire
 
-    lda #$06; sta VIC_BG
+    lda #$0e; sta VIC_BG        // CTM BG colour = $0E (light blue)
 
     jsr KRNL_CLRSCN
     jsr UseGameCharset      // game charset active for map tiles

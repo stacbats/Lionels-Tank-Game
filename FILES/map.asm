@@ -2,15 +2,15 @@
 // map.asm  -  CharPad map loader, tile expander & charset copy.
 //
 // Backdrop project dimensions (from .bin file sizes):
-//   Charset:  72 chars   (576 bytes  = 72 × 8 bytes per char)
-//   Tiles:    18 tiles   (72 bytes   = 18 × 4, each tile is 2×2 chars)
-//   Map:      20×12 tile cells (240 bytes, tile indices 0-17)
+//   Charset:  108 chars  (864 bytes  = 108 × 8 bytes per char)
+//   Tiles:    27 tiles   (108 bytes  = 27 × 4, each tile is 2×2 chars)
+//   Map:      20×12 tile cells (240 bytes, tile indices 0-26)
 //   Screen:   40×24 chars after expansion (row 0 = HUD, rows 1-24 = map)
-//   Attribs:  72 bytes, low nibble = VIC colour per char
+//   Attribs:  108 bytes, low nibble = VIC colour per char
 //
 // Charset is copied to $2800 (VIC block 5, real RAM in bank 0).
 // $1000-$1FFF and $3000-$3FFF are VIC character ROM shadows - do NOT use.
-// Sprites end at $2180, so $2800-$2A3F (576 bytes) is safe.
+// Sprites end at $2180, so $2800-$2D80 (864 bytes) is safe.
 //
 // HOW TO USE - in main.asm:
 //   1. Keep:  #import "map.asm"
@@ -20,9 +20,9 @@
 #importonce
 #import "vars.asm"
 
-.const CHARSET_ADDR  = $2800   // destination for 576 bytes of char data
+.const CHARSET_ADDR  = $2800   // destination for 864 bytes of char data
                                // $2800 = VIC block 5 in bank 0 ($2000-$2FFF is real RAM)
-                               // Sprites end at $2180, so $2800-$2A3F is safe
+                               // Sprites end at $2180, so $2800-$2D7F is safe
 
 .const MAP_COLS      = 20      // map width  in tiles
 .const MAP_ROWS      = 12      // map height in tiles
@@ -36,11 +36,12 @@
 
 // =============================================================
 // LoadCharset
-//   Copies 576 bytes of char pixel data to CHARSET_ADDR ($2800).
+//   Copies 864 bytes of char pixel data to CHARSET_ADDR ($2800).
+//   864 = 108 chars × 8 bytes = 3 full pages (768) + 96 extra.
 //   Sets VIC_MEMCTRL: screen=$0400, charset=$2800 ($1A).
 // =============================================================
 LoadCharset: {
-    // 576 bytes = 2 full 256-byte pages + 64 extra bytes
+    // pages 0, 1, 2 — full 256-byte pages
     ldx #0
 !p0:
     lda charset_src_data,x
@@ -52,14 +53,19 @@ LoadCharset: {
     sta CHARSET_ADDR+$100,x
     inx
     bne !p1-
-    // last 64 bytes
-    ldx #0
 !p2:
     lda charset_src_data+$200,x
     sta CHARSET_ADDR+$200,x
     inx
-    cpx #64
     bne !p2-
+    // last 96 bytes (864 - 768 = 96)
+    ldx #0
+!p3:
+    lda charset_src_data+$300,x
+    sta CHARSET_ADDR+$300,x
+    inx
+    cpx #96
+    bne !p3-
 
     // VIC_MEMCTRL = (screen_block << 4) | (charset_block << 1)
     //   Screen  at $0400 → block 1 → 1<<4 = $10
@@ -85,17 +91,17 @@ LoadCharset: {
 //   which is the default: $01 = $37).  Each char = 8 bytes.
 //
 //   Slot map (written into CHARSET_ADDR + slot*8):
-//     72=A  73=B  74=K  75=L  76=N  77=O  78=T  79=pip($51)  80=space
+//     108=A  109=B  110=K  111=L  112=N  113=O  114=T  115=pip($51)  116=space
 // =============================================================
-.const HUD_SLOT_A     = 72
-.const HUD_SLOT_B     = 73
-.const HUD_SLOT_K     = 74
-.const HUD_SLOT_L     = 75
-.const HUD_SLOT_N     = 76
-.const HUD_SLOT_O     = 77
-.const HUD_SLOT_T     = 78
-.const HUD_SLOT_PIP   = 79
-.const HUD_SLOT_SPC   = 80
+.const HUD_SLOT_A     = 108
+.const HUD_SLOT_B     = 109
+.const HUD_SLOT_K     = 110
+.const HUD_SLOT_L     = 111
+.const HUD_SLOT_N     = 112
+.const HUD_SLOT_O     = 113
+.const HUD_SLOT_T     = 114
+.const HUD_SLOT_PIP   = 115
+.const HUD_SLOT_SPC   = 116
 
 CopyRomCharsToGameset: {
     // Char ROM is at CPU $D000 but hidden behind I/O by default.
@@ -172,6 +178,9 @@ CopyRomCharsToGameset: {
 //   automatically visible to VIC as "block 2" in bank 0.
 // =============================================================
 UseRomCharset: {
+    lda VIC_CTRL2
+    and #%11101111             // bit 4 = MCM off for menu/text
+    sta VIC_CTRL2
     lda #MEMCTRL_ROM        // $15: screen=$0400, charset=ROM
     sta VIC_MEMCTRL
     rts
@@ -196,7 +205,13 @@ UseGameCharset: {
 //   and a jsr DrawCell subroutine to keep things readable.
 // =============================================================
 DrawMap: {
-    lda #0; sta $fe         // $fe = cell index (0..239)
+    // Enable VIC multicolour character mode + set shared MC colours
+    lda VIC_CTRL2
+    ora #%00010000             // bit 4 = MCM on
+    sta VIC_CTRL2
+    lda #$09; sta VIC_MC1      // MC colour 1 = $09 brown  (CTM header byte 13)
+    lda #$06; sta VIC_MC2      // MC colour 2 = $06 blue   (CTM header byte 14)
+    lda #0; sta $fe            // $fe = cell index (0..239)
 !loop:
     ldx $fe
     jsr DrawCell            // draw one tile
@@ -236,14 +251,14 @@ DrawCell: {
     lda $f6
     sta (scr_ptr_lo),y
     tax
-    lda char_attrib_data,x; and #$0f
+    lda char_attrib_data,x  // full byte: bit3=MC flag, bits0-2=colour 11
     sta (col_ptr_lo),y
 
     ldy #1
     lda $f7
     sta (scr_ptr_lo),y
     tax
-    lda char_attrib_data,x; and #$0f
+    lda char_attrib_data,x
     sta (col_ptr_lo),y
 
     // advance pointers one row down (+40)
@@ -258,14 +273,14 @@ DrawCell: {
     lda $f8
     sta (scr_ptr_lo),y
     tax
-    lda char_attrib_data,x; and #$0f
+    lda char_attrib_data,x
     sta (col_ptr_lo),y
 
     ldy #1
     lda $f9
     sta (scr_ptr_lo),y
     tax
-    lda char_attrib_data,x; and #$0f
+    lda char_attrib_data,x
     sta (col_ptr_lo),y
 
     rts
